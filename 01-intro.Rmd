@@ -1,0 +1,121 @@
+
+
+# Top 10 paises UE por PIB {#intro}
+
+En este gráfico de barras se muestra la evolución del ranking del PIB de los paises de la Unión Europea desde el año 1980. 
+
+Podemos observar que Alemania, Francia, Italia y España ocupan los primeros puestos sin cambios durante el periodo considerado.
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(XML)
+library(rsdmx)
+library(data.table)
+library (zoo)
+library(pdfetch)
+library(zoo)
+library(pdfetch)
+library(ggplot2)
+library(gganimate)
+library(dplyr)
+library(knitr)
+schema_url <- 'http://ec.europa.eu/eurostat/SDMX/diss-web/rest/datastructure/ESTAT/DSD_nama_10_gdp'
+dsd <- readSDMX(schema_url)
+codelists <- dsd@codelists@codelists
+dimensions <- sapply(codelists, function(x) x@id)
+geo_descr <- data.table(as.data.frame(dsd@codelists, codelistId = 'CL_GEO'))
+geo_descr <- geo_descr[, -c(2:3)]
+setnames(geo_descr, c('GEO','GEO_DESCR'))
+string_geo <- paste(geo_descr$GEO, collapse = '+')
+string_geo <- substring(string_geo, nchar('EU27_2020+EU28+EU15+EA+EA19+EA12+')+1, nchar(string_geo)-nchar('+UK+IS+LI+NO+CH+ME+MK+AL+RS+TR+BA+XK'))
+url <- paste('http://ec.europa.eu/eurostat/SDMX/diss-web/rest/data/nama_10_gdp/.CP_MEUR.B1GQ.',string_geo, '/?startPeriod=1980&endPeriod=2019',sep="")
+sdmx <- readSDMX(url)
+stats <- data.table(as.data.frame(sdmx))
+data <-merge(stats, geo_descr, by="GEO")
+data[, Date := as.Date(as.yearmon(obsTime))]
+setnames(data,c(1,5,6,9),c("country_code","year","value","country_name"))
+data<-setcolorder(data,c("country_name","country_code","year","value"))
+data<-data[,c(5:10):=NULL]
+gdp_formatted <- data %>%
+  group_by(year) %>%
+  # The * 1 makes it possible to have non-integer ranks while sliding
+  mutate(rank = rank(-value),
+         Value_rel = value/value[rank==1],
+         Value_lbl = paste0(" ",round(value/1e4))) %>%
+  group_by(country_name) %>% 
+  filter(rank <=10) %>%
+  ungroup()
+
+
+
+staticplot = ggplot(gdp_formatted, aes(rank, group = country_name, 
+                fill = as.factor(country_name), color = as.factor(country_name))) +
+  geom_tile(aes(y = value/2,
+                height = value,
+                width = 0.9), alpha = 0.8, color = NA) +
+  geom_text(aes(y = 0, label = paste(country_name, " ")), vjust = 0.2, hjust = 1) +
+  geom_text(aes(y=value,label = Value_lbl, hjust=0)) +
+  coord_flip(clip = "off", expand = FALSE) +
+  scale_y_continuous(labels = scales::comma) +
+  scale_x_reverse() +
+  guides(color = FALSE, fill = FALSE) +
+  theme(axis.line=element_blank(),
+        axis.text.x=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks=element_blank(),
+        axis.title.x=element_blank(),
+         axis.title.y=element_blank(),
+        legend.position="none",
+        panel.background=element_blank(),
+        panel.border=element_blank(),
+        panel.grid.major=element_blank(),
+        panel.grid.minor=element_blank(),
+        panel.grid.major.x = element_line( size=.1, color="grey" ),
+        panel.grid.minor.x = element_line( size=.1, color="grey" ),
+        plot.title=element_text(size=25, hjust=0.5, face="bold", colour="grey", vjust=-1),
+        plot.subtitle=element_text(size=18, hjust=0.5, face="italic", color="grey"),
+        plot.caption =element_text(size=8, hjust=0.5, face="italic", color="grey"),
+        plot.background=element_blank(),
+       plot.margin = margin(2,2, 2, 4, "cm"))
+
+anim = staticplot + transition_states(year, transition_length = 4, state_length = 1) +
+  view_follow(fixed_x = TRUE)  +
+  labs(title = 'PIB por Año : {closest_state}',  
+       subtitle  =  "Top 10 paises UE",
+       caption  = "PIB en millones EUR | Data Source: EUROSTAT")
+anim
+```
+
+
+# Evolución del déficit y superávit público
+
+El siguiente gráfico de barras muestra la evolución del déficit público. El gráfico permite hacer zoom sobre aquellos puntos de interés. 
+
+La librería **plotly-r** nos facilita la animación e interaccción con el gráfico. Se ha elegido el rojo para los valores negativos por convenio de la contabilidad.
+
+Destaca Irlanda el año 2010 con un 32% de déficit. Además, observamos que el déficit es la tónica general a lo largo de los años de estudio.
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning = FALSE)
+```
+
+```{r message=FALSE, warning=FALSE}
+library(plotly)
+
+data2<-datos
+
+fig2 <- data2 %>%
+  plot_ly(
+    y = ~Country,
+    x = ~deficit_pib,
+    frame = ~obsTime,
+    type = 'bar',
+    mode = 'markers',
+    showlegend = F,
+    color= ~deficit_pib<0,
+    colors = c("chartreuse3", "red"),
+    orientation='h'
+  ) %>% layout(yaxis = list(categoryorder = "array", categoryarray = ~deficit_pib))
+
+fig2
+
+```
