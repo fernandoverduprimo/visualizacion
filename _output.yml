@@ -1,4 +1,6 @@
 bookdown::gitbook:
+  toolbar:
+    download: '_book/book.pdf'
   css: style.css
   config:
     toc:
