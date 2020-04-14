@@ -26,7 +26,7 @@ Este **documento** se ha confeccionado utilizando la librería de R [Bookdown](h
 Los **datos** se han obtenido de la base de datos de [Eurostat Data](https://ec.europa.eu/eurostat/data/database). Eurostat permite la descarga de datos mediante SDMX, una metodología que facilita el intercambio de datos de manera rápida y sencilla.
 
 
-
+El código de está en [github](https://github.com/fernandoverduprimo/visualizacion.git).
 
 
 ```{r echo=FALSE}
