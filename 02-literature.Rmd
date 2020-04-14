@@ -1,0 +1,59 @@
+# Filtering y Brushing Gasto en TIC por cápita
+
+El siguiente gráfico muestra el gasto en TIC ("Tecnologías de la información y la comunicación") por cápita de los paises de la zona Euro. Los filtros permiten elegir por país y por año. El mapa es un choropleth de europa destaca la selección del país por gasto en TIC. 
+
+Los dos últimos gráficos, scatter plot, relacionan el gasto en Tic con el PIB por cápita y, por otro lado, la evolución del gasto en PIB por año. 
+
+Éstos dos últimos gráficos permiten *brushing*, de modo que la selección de puntos en uno de ellos se destaca en el otro.
+
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning = FALSE)
+```
+
+
+```{r}
+
+library(plotly)
+library(crosstalk)
+library(d3scatter)
+library(data.table)
+library(d3scatter)
+
+PIB_capita<-PIB_capita[,GeoC:=countrycode(GEO, origin = 'iso2c', destination = 'iso3c')]
+PIB_capita<-PIB_capita[,Country:=countrycode(GEO, origin = 'iso2c', destination = 'country.name')]
+l <- list(color = toRGB("grey"), width = 0.5)
+
+l <- list(color = toRGB("grey"), width = 0.5)
+
+dfgeo <- datos[obsTime=='2017']
+
+dfgeo<-na.omit(datos)
+sd<-SharedData$new(data=dfgeo)
+filter_pais<-filter_select("auto", "País", sd, ~Country,multiple = TRUE)
+filter_año<-filter_select("años", "Año", sd, ~obsTime,multiple = TRUE)
+fig <- plot_geo(sd)
+
+fig <- fig %>% add_trace(
+    z = ~pib_capita, color = ~pib_capita, colors = 'Blues',
+    text = ~Country, locations = ~GeoC, marker = list(line = l)) %>% layout(geo=list(scope='europe'),fixedranged=TRUE) %>% colorbar(title="Pib por cápita")
+
+bscols(
+  list(fig,
+    bscols(filter_pais,filter_año),
+    bscols(
+      d3scatter(sd, ~pib_capita, ~tic_pib, ~GeoC, width="100%", height=300),
+      d3scatter(sd, ~obsTime, ~tic_pib, ~GeoC, width="100%", height=300)
+      )
+    )
+)
+
+
+
+
+```
+
+
+
+
+
+

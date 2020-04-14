@@ -1,0 +1,159 @@
+--- 
+title: "Visualización de datos Eurostat"
+author: "Fernando Verdú Primo"
+date: "`r Sys.Date()`"
+site: bookdown::bookdown_site
+documentclass: book
+
+biblio-style: apalike
+link-citations: yes
+description: "Actividad-Seminario de la asignatura Visualización del Master en Big Data y Data Science de la Viu."
+---
+```{r include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message=FALSE, warning = FALSE)
+```
+
+# Introducción
+
+Presentamos la Actividad-Seminario de la asignatura Visualización del Master en Big Data y Data Science de la Universitat Viu. 
+
+El seminario tiene un componenente **explicativo**. El __objetivo__ es comparar los diferentes paises de la zona Euro en cuanto a algunos items como nivel de digitalización y nivel educativo; y la relación de estos con el PIB per cápita y el déficit público de cada país.
+
+El **público objetivo**  son los alumnos de Economía de Bachillerato y primeros cursos del grado de Empresariales, ADE y Economía.
+
+Este **documento** se ha confeccionado utilizando la librería de R [Bookdown](https://bookdown.org/yihui/bookdown/). Esta librería permite editar en un mismo documento texto, código y gráficos, y, además, genera diversos tipos de salida como html, shiny apps, word, pdf, ...
+
+Los **datos** se han obtenido de la base de datos de [Eurostat Data](https://ec.europa.eu/eurostat/data/database). Eurostat permite la descarga de datos mediante SDMX, una metodología que facilita el intercambio de datos de manera rápida y sencilla.
+
+
+
+
+
+```{r echo=FALSE}
+
+library(rsdmx); library(data.table); library(zoo); library(pdfetch);library(countrycode)
+
+dsdfunc<-function(base){
+schema_url <- paste0('http://ec.europa.eu/eurostat/SDMX/diss-web/rest/datastructure/ESTAT/DSD_',base)
+st<-readSDMX(schema_url)
+
+}
+
+dsd<-dsdfunc('nama_10_pc')
+
+
+urlquery<-function(base,freq,unit,na_item,geo){
+codelists <- dsd@codelists@codelists
+url <- paste0('http://ec.europa.eu/eurostat/SDMX/diss-web/rest/data/',base,'/',freq,'.',unit,'.',na_item,'.',geo,'/?startPeriod=2007')
+
+}
+
+query<-urlquery('nama_10_pc','A','CP_EUR_HAB','B1GQ','')
+
+
+sdmx<-readSDMX(query)
+PIB_capita <- data.table(as.data.frame(sdmx))
+setkey(PIB_capita,NULL)
+
+PIB_capita<-PIB_capita[,c("NA_ITEM","FREQ","OBS_STATUS","OBS_FLAG"):=NULL]
+PIB_capita<- PIB_capita[,pib_capita:=obsValue][,obsValue:=NULL]
+setkey(PIB_capita,"GEO","obsTime")
+
+```
+
+
+
+```{r  echo=FALSE}
+# Porcentage TIC en PIB
+ticdsd<-dsdfunc('isoc_bde15ag')
+urlTIC <- paste0('http://ec.europa.eu/eurostat/SDMX/diss-web/rest/data/','isoc_bde15ag','/','A.','ICT','.','/?startPeriod=2007')
+sdmxTix<-readSDMX(urlTIC)
+TIC_PIB <- data.table(as.data.frame(sdmxTix))
+setkey(TIC_PIB,"GEO","obsTime")
+TIC_PIB<-TIC_PIB[,c("FREQ","OBS_STATUS","OBS_FLAG","NACE_R2"):=NULL]
+setnames(TIC_PIB,"obsValue","tic_pib")
+```
+
+
+```{r echo=FALSE}
+# Deficit per PIB
+deficitdsd<-dsdfunc('gov_10dd_edpt1')
+urlDef <- paste0('http://ec.europa.eu/eurostat/SDMX/diss-web/rest/data/','gov_10dd_edpt1','/.PC_GDP','.S13.B9.','/?startPeriod=2008')
+
+sdmxDef<-readSDMX(urlDef)
+DEF_PIB <- data.table(as.data.frame(sdmxDef))
+DEF_PIB<-DEF_PIB[,c("SECTOR","NA_ITEM","FREQ","UNIT"):=NULL]
+setnames(DEF_PIB,"obsValue","deficit_pib")
+setkey(DEF_PIB,"GEO","obsTime")
+```
+
+
+
+```{r echo=FALSE}
+# Digital Skills
+digitaldsd<-dsdfunc('isoc_sk_dskl_i')
+urlDigital <- paste0('http://ec.europa.eu/eurostat/SDMX/diss-web/rest/data/','isoc_sk_dskl_i','/A.I_DSK_L+I_DSK_B+I_DSK_AB+I_DSK_X+I_DSK_NA','.IND_TOTAL.PC_IND.','/?startPeriod=2008')
+
+sdmxDigital<-readSDMX(urlDigital)
+DIGITAL <- data.table(as.data.frame(sdmxDigital))
+
+setnames(DIGITAL,'INDIC_IS','Nivel')
+DIGITAL[Nivel=="I_DSK_L",Nivel:='Bajo']
+DIGITAL[Nivel=="I_DSK_B",Nivel:='Básico']
+DIGITAL[Nivel=="I_DSK_AB",Nivel:='Avanzado']
+DIGITAL[Nivel=="I_DSK_X",Nivel:='Nulo']
+DIGITAL[Nivel=="I_DSK_NA",Nivel:='Sin conexión en 3 meses']
+DIGITAL<-DIGITAL[,c("UNIT","IND_TYPE","FREQ","OBS_STATUS", "OBS_FLAG"):=NULL]
+setkey(DIGITAL,"GEO","obsTime")
+
+
+```
+
+
+```{r echo=FALSE}
+
+# Población y empleo
+empleoPobdsd<-dsdfunc('nama_10_pe')
+urlEmpleo <- paste0('http://ec.europa.eu/eurostat/SDMX/diss-web/rest/data/','nama_10_pe','/A.THS_PER.EMP_NC+POP_NC.','/?startPeriod=2008')
+
+sdmxEmpleo<-readSDMX(urlEmpleo)
+EMPLEO <- data.table(as.data.frame(sdmxEmpleo))
+
+EMPLEO_POB<- EMPLEO[,c("UNIT","FREQ","OBS_STATUS", "OBS_FLAG"):=NULL]
+
+setkey(EMPLEO_POB,"GEO","obsTime")
+setnames(EMPLEO_POB,"obsValue","empleo_pob")
+
+```
+
+
+
+```{r echo=FALSE}
+
+# Educación
+Educaciondsd<-dsdfunc('trng_lfs_02')
+urlEducacion <- paste0('http://ec.europa.eu/eurostat/SDMX/diss-web/rest/data/','trng_lfs_02','/A.PC.ED0-2+ED3_4+ED5-8.M+F.Y18-64.','/?startPeriod=2008')
+
+sdmxEducacion<-readSDMX(urlEducacion)
+EDUCACION <- data.table(as.data.frame(sdmxEducacion))
+
+EDUCACION[,c("ISCED11","UNIT","AGE","FREQ","OBS_FLAG","OBS_STATUS"):=NULL]
+
+setkey(EDUCACION,"GEO","obsTime")
+
+```
+
+
+
+```{r echo=FALSE}
+
+datos<- PIB_capita[TIC_PIB]
+# All together
+
+datos<-datos[,Country:=countrycode(GEO, origin = 'iso2c', destination = 'country.name')]
+datos<-datos[,GeoC:=countrycode(GEO, origin = 'iso2c', destination = 'iso3c')]
+datos<-datos[DEF_PIB]
+
+
+datos<-datos[,UNIT:=NULL]
+```
